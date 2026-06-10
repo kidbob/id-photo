@@ -51,7 +51,15 @@ const bgActions = BG_COLORS.map((c) => ({
 const currentBg = computed(() => findBgColor(bgColorId.value))
 
 onMounted(() => {
-  if (route.query.fromShortcut === '1') {
+  if (route.query.shortcutError === '1') {
+    showDialog({
+      title: '快捷指令未完成',
+      message:
+        '常见原因：① 旧版快捷指令动作有误，请删除后重新「添加快捷指令」；② 抠图失败请换背景更简单的照片；③ 未允许快捷指令访问相册。也可按「安装指令」页手动创建。',
+      confirmButtonText: '知道了',
+    })
+    router.replace({ path: route.path, query: {} })
+  } else if (route.query.fromShortcut === '1') {
     awaitingPhoto.value = true
     showToast({ message: '抠图完成，请选刚存入相簿的照片', duration: 3500 })
     router.replace({ path: route.path, query: {} })
@@ -263,8 +271,8 @@ function downloadResult() {
         @select="onPickBg"
       />
       <van-cell
-        title="优化黑发边缘"
-        label="填补刘海空隙、去除白/蓝边毛刺（深色头发推荐开启）"
+        title="优化抠图外缘"
+        label="仅修补人像轮廓上的白边/空隙，不涂抹五官内部"
       >
         <template #right-icon>
           <van-switch v-model="refineHairEdges" size="20" />

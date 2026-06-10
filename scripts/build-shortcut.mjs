@@ -1,6 +1,6 @@
 /**
  * 生成「证件照抠图」快捷指令
- * 流程：选照片 → 移除背景 → 存入相簿（无弹窗，便于 x-callback-url 自动跳回 App）
+ * 流程：选照片 → 移除背景 → 存储到相簿（is.workflow.actions.savetocameraroll）
  */
 import { writeFileSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
@@ -44,7 +44,7 @@ const workflow = {
       },
     },
     {
-      WFWorkflowActionIdentifier: 'is.workflow.actions.savetophotoalbum',
+      WFWorkflowActionIdentifier: 'is.workflow.actions.savetocameraroll',
       WFWorkflowActionParameters: {
         UUID: saveUuid,
         WFInput: refOutput(removeUuid, 'Image'),

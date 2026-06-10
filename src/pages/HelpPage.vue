@@ -112,6 +112,9 @@ function copyLink() {
       <ul class="steps">
         <li><strong>点添加没反应</strong>：必须用 Safari；检查「允许不受信任的快捷指令」</li>
         <li><strong>提示无法导入</strong>：改用手动创建；或升级 iOS / 快捷指令 App</li>
+        <li>
+          <strong>「运行快捷指令时出现问题」</strong>：先<strong>删除</strong>旧的「证件照抠图」，再重新添加快捷指令（旧版存储动作 ID 有误）。首次运行允许访问<strong>照片/相册</strong>。仍失败请用手动创建。
+        </li>
         <li><strong>抠图失败</strong>：换背景简单、人脸清晰的照片</li>
         <li><strong>衣服还有杂色</strong>：在证件照 App 关闭自动抠图，只处理快捷指令输出的 PNG</li>
       </ul>
