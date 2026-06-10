@@ -1,14 +1,20 @@
-# 证件照 PWA（方案 A）
+# 证件照 PWA + iPhone 快捷指令
 
-浏览器本机 AI 抠图 + 换底色 + 规格缩放 + KB 压缩。无需后端、无需快捷指令、照片不上传。
+**推荐流程**：快捷指令抠图（快、清晰）→ 本应用铺底色、缩放、压 KB。
 
-## 功能
+## 一键添加快捷指令
 
-- 本机抠图（`@imgly/background-removal`，WASM）
-- 白 / 蓝 / 红等底色合成
-- 一寸、二寸、签证照等规格
-- 上传模式：二分搜索压到 ≤50KB（可改）
-- 高清模式：PNG 导出
+1. iPhone **Safari** 打开部署地址
+2. 底部 **说明** → **添加快捷指令「证件照抠图」**
+3. 设置 → 快捷指令 → 打开 **允许不受信任的快捷指令**
+
+详细图文：[docs/shortcut-setup.md](docs/shortcut-setup.md)
+
+## 证件照 App 使用
+
+1. **制作** 页关闭「浏览器内自动抠图」
+2. 选择快捷指令保存的 PNG
+3. 选规格、底色 → 上传模式导出
 
 ## 本地开发
 
@@ -16,31 +22,22 @@
 cd D:\cursor-app\id-photo
 npm install
 npm run icons
+npm run shortcut
 npm run dev
 ```
 
 ## 部署 Vercel
 
-1. 将 `id-photo` 目录推送到 GitHub（可单独仓库或子目录）
-2. [Vercel](https://vercel.com/) → Import 项目
-3. **Root Directory** 设为 `id-photo`（若在 monorepo 内）
-4. 无需环境变量
-5. Deploy → `https://你的项目.vercel.app`
-6. iPhone Safari → 添加到主屏幕
-
-或使用 CLI：
+1. GitHub 导入 `id-photo` 目录
+2. 无需环境变量
+3. Deploy 后 Safari 打开 → 说明页安装快捷指令 → 添加到主屏幕
 
 ```bash
-cd id-photo
-npx vercel --prod
+npm run vercel-build
 ```
 
 ## 费用
 
-- Vercel 静态托管：个人用量通常免费
-- 抠图：0（算力在用户手机）
-- 无腾讯云 / OCR 等 API
-
-## 隐私
-
-图片仅在浏览器内存处理；Vercel 仅提供网页与 AI 模型静态文件下载。
+- Vercel 静态托管：个人免费档通常够用
+- 快捷指令抠图：0 元（本机）
+- 浏览器抠图（可选）：0 元但较慢，默认关闭

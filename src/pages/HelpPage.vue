@@ -1,69 +1,116 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { showToast } from 'vant'
 import { BG_COLORS, PHOTO_SPECS } from '../data/specs'
+import {
+  getShortcutFileUrl,
+  getShortcutImportUrl,
+  isLikelyIOS,
+} from '../utils/shortcut-install'
+
+const importUrl = computed(() => getShortcutImportUrl())
+const fileUrl = computed(() => getShortcutFileUrl())
+const onIos = computed(() => isLikelyIOS())
+
+function installShortcut() {
+  window.location.href = importUrl.value
+}
+
+function copyLink() {
+  navigator.clipboard?.writeText(importUrl.value).then(
+    () => showToast('已复制，请在 iPhone Safari 粘贴打开'),
+    () => showToast('请手动复制下方链接'),
+  )
+}
 </script>
 
 <template>
   <div class="page">
-    <div class="card">
-      <h3 class="section-title">方案 A：纯 PWA（当前）</h3>
+    <div class="card highlight">
+      <h3 class="section-title">一键添加快捷指令</h3>
       <p class="hint">
-        抠图、换底色、缩放、压 KB 全在本机浏览器完成，<strong>无需快捷指令、无需后端</strong>。
-        可部署到 Vercel，添加到 iPhone 主屏幕使用。
+        与网上分享的快捷指令一样：在 iPhone 上点按钮 → 跳转到「快捷指令」→ 点「添加快捷指令」即可。
+        需 iOS 16 及以上。
       </p>
+      <van-button v-if="onIos" type="primary" block round size="large" @click="installShortcut">
+        添加快捷指令「证件照抠图」
+      </van-button>
+      <template v-else>
+        <p class="hint">请在 <strong>iPhone 的 Safari</strong> 打开本页面，再点下方按钮。</p>
+        <van-button type="primary" block round plain @click="copyLink">复制安装链接</van-button>
+      </template>
+      <p class="hint link-hint">
+        若按钮无效，在 Safari 地址栏粘贴：<br />
+        <code class="break">{{ importUrl }}</code>
+      </p>
+      <p class="hint">
+        快捷指令文件直链：<code>{{ fileUrl }}</code>
+      </p>
+    </div>
+
+    <div class="card">
+      <h3 class="section-title">第一次使用前（必看）</h3>
       <ol class="steps">
-        <li>选一张半身证件照（背景尽量简单）</li>
-        <li>开启「自动抠图换底」→ 选规格与底色</li>
-        <li>上传模式：自动压到报名 KB 上限；高清模式：导出 PNG</li>
-        <li>长按结果图保存到相簿</li>
+        <li>打开 iPhone <strong>设置</strong></li>
+        <li>进入 <strong>快捷指令</strong></li>
+        <li>打开 <strong>允许不受信任的快捷指令</strong>（若没有此项，先随便运行一次快捷指令再回来看）</li>
+        <li>若提示需要先在 App 内运行快捷指令，可先完成下方「手动添加」第 1 步再回来打开</li>
       </ol>
     </div>
 
     <div class="card">
-      <h3 class="section-title">内置规格</h3>
+      <h3 class="section-title">完整使用流程</h3>
+      <ol class="steps">
+        <li><strong>快捷指令</strong>：运行「证件照抠图」→ 选照片 → 自动抠图 → 透明 PNG 存入相簿</li>
+        <li><strong>证件照 App</strong>：「制作」页 → 确认已<strong>关闭</strong>「浏览器内自动抠图」</li>
+        <li>选择刚保存的照片 → 选规格、底色 → 上传模式压到 ≤50KB → 保存</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h3 class="section-title">手动创建（链接失败时）</h3>
+      <p class="hint">零基础可按 <code>docs/shortcut-setup.md</code> 在 App 里自己搭，约 10 分钟。</p>
+      <ol class="steps">
+        <li>打开「快捷指令」→ 右上角 <strong>＋</strong></li>
+        <li>添加「选取照片」→ 关闭「选择多张」</li>
+        <li>添加「移除图像背景」→ 输入选「照片」</li>
+        <li>添加「存储到相簿」→ 输入选上一步图像</li>
+        <li>添加「显示提醒」：抠图完成，请打开证件照 App 压缩</li>
+        <li>右上角「完成」，命名「证件照抠图」</li>
+      </ol>
+      <p class="hint">更详细图文步骤见项目文档 shortcut-setup.md。</p>
+    </div>
+
+    <div class="card">
+      <h3 class="section-title">规格与底色（在证件照 App 里选）</h3>
       <ul class="steps">
         <li v-for="s in PHOTO_SPECS.filter((x) => x.id !== 'custom')" :key="s.id">
           {{ s.name }}：{{ s.width }}×{{ s.height }} px，默认 ≤{{ s.maxKb }} KB
         </li>
       </ul>
-    </div>
-
-    <div class="card">
-      <h3 class="section-title">底色</h3>
       <ul class="steps">
         <li v-for="c in BG_COLORS" :key="c.id">{{ c.name }} {{ c.hex }}</li>
       </ul>
     </div>
 
     <div class="card">
-      <h3 class="section-title">费用与隐私</h3>
+      <h3 class="section-title">常见问题</h3>
       <ul class="steps">
-        <li>抠图算力在您的 iPhone 上运行，<strong>0 API 费用</strong></li>
-        <li>照片不上传服务器（Vercel 只托管网页和模型文件）</li>
-        <li>首次使用需从网络加载 AI 模型（约 10MB），之后可缓存</li>
+        <li><strong>点添加没反应</strong>：必须用 Safari；检查「允许不受信任的快捷指令」</li>
+        <li><strong>提示无法导入</strong>：改用手动创建；或升级 iOS / 快捷指令 App</li>
+        <li><strong>抠图失败</strong>：换背景简单、人脸清晰的照片</li>
+        <li><strong>衣服还有杂色</strong>：在证件照 App 关闭自动抠图，只处理快捷指令输出的 PNG</li>
       </ul>
-    </div>
-
-    <div class="card">
-      <h3 class="section-title">安装到 iPhone</h3>
-      <ol class="steps">
-        <li>Safari 打开 Vercel 部署地址</li>
-        <li>分享 → 添加到主屏幕</li>
-        <li>从主屏幕图标打开，全屏使用</li>
-      </ol>
-    </div>
-
-    <div class="card">
-      <h3 class="section-title">可选：快捷指令方案</h3>
-      <p class="hint">
-        若本机抠图较慢或边缘不满意，仍可用快捷指令抠图后，在本应用中
-        <strong>关闭「自动抠图」</strong>，直接导入 PNG 压缩。详见
-        <code>docs/shortcut-setup.md</code>。
-      </p>
     </div>
   </div>
 </template>
 
 <style scoped>
+.highlight {
+  border: 1px solid #c5d4ff;
+  background: #f8faff;
+}
+
 .steps {
   margin: 0;
   padding-left: 20px;
@@ -77,5 +124,17 @@ code {
   background: #f0f1f5;
   padding: 2px 6px;
   border-radius: 4px;
+  word-break: break-all;
+}
+
+code.break {
+  display: block;
+  margin-top: 8px;
+  padding: 8px;
+  line-height: 1.5;
+}
+
+.link-hint {
+  margin-top: 12px;
 }
 </style>

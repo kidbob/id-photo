@@ -1,5 +1,5 @@
 {
-  "installCommand": "npm install && npm run icons",
+  "installCommand": "npm install && npm run icons && npm run shortcut",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": null,

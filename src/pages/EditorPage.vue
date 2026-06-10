@@ -16,7 +16,7 @@ const customWidth = ref(295)
 const customHeight = ref(413)
 const resultInfo = ref('')
 const processing = ref(false)
-const removeBackground = ref(true)
+const removeBackground = ref(false)
 const mattingQuality = ref<MattingQuality>('quality')
 const progressText = ref('')
 const showSpecPicker = ref(false)
@@ -136,29 +136,25 @@ function downloadResult() {
     <div class="card">
       <h3 class="section-title">选择照片</h3>
       <p class="hint">
-        选照片 → 本机 AI 抠图 → 换底色 → 按规格导出。照片仅在手机浏览器内处理，不上传服务器。
-        首次抠图需下载模型（精细约 80MB），请保持网络畅通。
+        <strong>推荐：</strong>先用 iPhone「快捷指令」抠图（快、效果好），再在此选照片换底色并压 KB。
+        请关闭下方「自动抠图」。详见「说明」页一键安装快捷指令。
       </p>
       <van-uploader :after-read="onFileRead" accept="image/*" :max-count="1" preview-size="120" />
       <img v-if="previewUrl && !resultUrl" :src="previewUrl" class="preview" alt="原图预览" />
     </div>
 
     <div class="card">
-      <h3 class="section-title">抠图</h3>
-      <van-cell title="自动抠图换底" label="关闭则仅缩放/压缩（适用于已抠好的 PNG）">
+      <h3 class="section-title">抠图方式</h3>
+      <van-cell title="浏览器内自动抠图（较慢）" label="建议保持关闭，改用快捷指令抠图">
         <template #right-icon>
           <van-switch v-model="removeBackground" size="20" />
         </template>
       </van-cell>
       <template v-if="removeBackground">
-        <p class="hint">抠图精度</p>
         <van-radio-group v-model="mattingQuality" direction="horizontal" class="mode-group">
-          <van-radio name="quality">精细（推荐）</van-radio>
+          <van-radio name="quality">精细</van-radio>
           <van-radio name="fast">快速</van-radio>
         </van-radio-group>
-        <p class="hint">
-          精细模式边缘更好，首次约多下载 40MB 模型。红/蓝底若渗入头发或白衣，请用精细并换背景简单的原图。
-        </p>
       </template>
     </div>
 

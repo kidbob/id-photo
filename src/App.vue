@@ -19,7 +19,7 @@ function onChange(name: string | number) {
     </main>
     <van-tabbar v-model="active" @change="onChange" safe-area-inset-bottom>
       <van-tabbar-item name="editor" icon="photo-o">制作</van-tabbar-item>
-      <van-tabbar-item name="help" icon="question-o">说明</van-tabbar-item>
+      <van-tabbar-item name="help" icon="add-o">安装指令</van-tabbar-item>
     </van-tabbar>
   </div>
 </template>
