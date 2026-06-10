@@ -17,6 +17,7 @@ declare module 'vue' {
     VanButton: typeof import('vant/es')['Button']
     VanCell: typeof import('vant/es')['Cell']
     VanField: typeof import('vant/es')['Field']
+    VanNoticeBar: typeof import('vant/es')['NoticeBar']
     VanRadio: typeof import('vant/es')['Radio']
     VanRadioGroup: typeof import('vant/es')['RadioGroup']
     VanSwitch: typeof import('vant/es')['Switch']

@@ -1,9 +1,20 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { showLoadingToast, closeToast, showToast } from 'vant'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { showLoadingToast, closeToast, showToast, showDialog } from 'vant'
 import { BG_COLORS, PHOTO_SPECS, findSpec } from '../data/specs'
 import type { ExportMode, MattingQuality } from '../types'
 import { formatSize, processIdPhoto } from '../utils/image-process'
+import {
+  getShortcutImportUrl,
+  hasShortcutInstallHint,
+  isLikelyIOS,
+  markShortcutInstalled,
+  runShortcutFromApp,
+} from '../utils/shortcut-install'
+
+const route = useRoute()
+const router = useRouter()
 
 const file = ref<File | null>(null)
 const previewUrl = ref('')
@@ -21,15 +32,33 @@ const mattingQuality = ref<MattingQuality>('quality')
 const progressText = ref('')
 const showSpecPicker = ref(false)
 const showBgPicker = ref(false)
+const awaitingPhoto = ref(false)
+const showAdvanced = ref(false)
 
 const currentSpec = computed(() => findSpec(specId.value))
 const isCustom = computed(() => specId.value === 'custom')
 const targetWidth = computed(() => (isCustom.value ? customWidth.value : currentSpec.value.width))
 const targetHeight = computed(() => (isCustom.value ? customHeight.value : currentSpec.value.height))
 const bgHex = computed(() => BG_COLORS.find((c) => c.id === bgColorId.value)?.hex ?? '#FFFFFF')
+const onIos = computed(() => isLikelyIOS())
 
 const specActions = PHOTO_SPECS.map((s) => ({ name: s.name, specId: s.id }))
 const bgActions = BG_COLORS.map((c) => ({ name: c.name, bgId: c.id }))
+
+onMounted(() => {
+  if (route.query.fromShortcut === '1') {
+    awaitingPhoto.value = true
+    showToast({ message: '抠图完成，请选刚存入相簿的照片', duration: 3500 })
+    router.replace({ path: route.path, query: {} })
+  } else if (onIos.value && !hasShortcutInstallHint()) {
+    showDialog({
+      title: '首次使用',
+      message:
+        '请先在「安装指令」页添加快捷指令「证件照抠图」。之后在本页点「开始抠图」即可，完成后会自动跳回。',
+      confirmButtonText: '知道了',
+    })
+  }
+})
 
 function onPickSpec(action: { specId?: string }) {
   if (!action.specId) return
@@ -50,6 +79,7 @@ function onFileRead(item: { file?: File } | { file?: File }[]) {
   const picked = first?.file
   if (!picked) return
   file.value = picked
+  awaitingPhoto.value = false
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
   previewUrl.value = URL.createObjectURL(picked)
   if (resultUrl.value) {
@@ -57,6 +87,24 @@ function onFileRead(item: { file?: File } | { file?: File }[]) {
     resultUrl.value = ''
   }
   resultInfo.value = ''
+}
+
+function startMatting() {
+  if (!onIos.value) {
+    showToast('请在 iPhone Safari 中使用')
+    return
+  }
+  markShortcutInstalled()
+  runShortcutFromApp()
+}
+
+function goInstallShortcut() {
+  if (onIos.value) {
+    window.location.href = getShortcutImportUrl()
+    markShortcutInstalled()
+    return
+  }
+  showToast('请在 iPhone Safari 打开本应用')
 }
 
 async function runExport() {
@@ -133,29 +181,42 @@ function downloadResult() {
 
 <template>
   <div class="page">
-    <div class="card">
-      <h3 class="section-title">选择照片</h3>
+    <div class="card workflow-card">
+      <h3 class="section-title">两步完成（不用来回找 App）</h3>
       <p class="hint">
-        <strong>推荐：</strong>先用 iPhone「快捷指令」抠图（快、效果好），再在此选照片换底色并压 KB。
-        请关闭下方「自动抠图」。详见「说明」页一键安装快捷指令。
+        iOS 不允许把快捷指令嵌在网页里，但可从本页<strong>一键启动</strong>抠图，完成后<strong>自动跳回</strong>这里继续操作。
       </p>
-      <van-uploader :after-read="onFileRead" accept="image/*" :max-count="1" preview-size="120" />
-      <img v-if="previewUrl && !resultUrl" :src="previewUrl" class="preview" alt="原图预览" />
-    </div>
 
-    <div class="card">
-      <h3 class="section-title">抠图方式</h3>
-      <van-cell title="浏览器内自动抠图（较慢）" label="建议保持关闭，改用快捷指令抠图">
-        <template #right-icon>
-          <van-switch v-model="removeBackground" size="20" />
-        </template>
-      </van-cell>
-      <template v-if="removeBackground">
-        <van-radio-group v-model="mattingQuality" direction="horizontal" class="mode-group">
-          <van-radio name="quality">精细</van-radio>
-          <van-radio name="fast">快速</van-radio>
-        </van-radio-group>
-      </template>
+      <div class="step">
+        <div class="step-head">
+          <span class="step-num">1</span>
+          <span class="step-title">抠图（快捷指令）</span>
+        </div>
+        <p class="hint">跳转到系统抠图 → 选照片 → 存相簿 → 自动回到本页</p>
+        <van-button type="primary" block round @click="startMatting">
+          开始抠图
+        </van-button>
+        <van-button plain type="primary" block round class="mt-8" @click="goInstallShortcut">
+          尚未安装？添加快捷指令
+        </van-button>
+      </div>
+
+      <div class="step-divider" />
+
+      <div class="step" :class="{ highlight: awaitingPhoto }">
+        <div class="step-head">
+          <span class="step-num">2</span>
+          <span class="step-title">换底色并压缩（本应用）</span>
+        </div>
+        <van-notice-bar
+          v-if="awaitingPhoto"
+          color="#1989fa"
+          background="#ecf9ff"
+          text="已跳回：请在下方选择刚存入相簿的透明底照片"
+        />
+        <van-uploader :after-read="onFileRead" accept="image/*" :max-count="1" preview-size="120" />
+        <img v-if="previewUrl && !resultUrl" :src="previewUrl" class="preview" alt="原图预览" />
+      </div>
     </div>
 
     <div class="card">
@@ -194,7 +255,6 @@ function downloadResult() {
         close-on-click-action
         @select="onPickBg"
       />
-      <p class="hint">抠图后会自动铺所选底色；若关闭抠图且为透明 PNG，也会铺底色。</p>
     </div>
 
     <div class="card">
@@ -215,9 +275,34 @@ function downloadResult() {
 
     <div class="card actions">
       <van-button type="primary" block round :loading="processing" @click="runExport">
-        {{ removeBackground ? '抠图并导出' : '处理并预览' }}
+        处理并导出
       </van-button>
       <p v-if="processing && progressText" class="hint progress-hint">{{ progressText }}</p>
+    </div>
+
+    <div class="card">
+      <van-cell
+        title="高级：浏览器内抠图（较慢）"
+        :value="showAdvanced ? '收起' : '展开'"
+        is-link
+        @click="showAdvanced = !showAdvanced"
+      />
+      <template v-if="showAdvanced">
+        <van-cell title="开启浏览器抠图">
+          <template #right-icon>
+            <van-switch v-model="removeBackground" size="20" />
+          </template>
+        </van-cell>
+        <van-radio-group
+          v-if="removeBackground"
+          v-model="mattingQuality"
+          direction="horizontal"
+          class="mode-group"
+        >
+          <van-radio name="quality">精细</van-radio>
+          <van-radio name="fast">快速</van-radio>
+        </van-radio-group>
+      </template>
     </div>
 
     <div v-if="resultUrl" class="card">
@@ -227,12 +312,56 @@ function downloadResult() {
       <van-button type="primary" block round plain class="mt-12" @click="downloadResult">
         保存到相册 / 下载
       </van-button>
-      <p class="hint">iPhone：长按图片 → 存储到照片；或 Safari 分享保存。</p>
+      <p class="hint">iPhone：长按图片 → 存储到照片</p>
     </div>
   </div>
 </template>
 
 <style scoped>
+.workflow-card {
+  border: 1px solid #c5d4ff;
+  background: #f8faff;
+}
+
+.step-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.step-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent, #4a6cf7);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.step-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.step.highlight {
+  padding: 12px;
+  margin: 0 -12px;
+  border-radius: 8px;
+  background: #ecf9ff;
+}
+
+.step-divider {
+  height: 1px;
+  background: #e5e8f0;
+  margin: 16px 0;
+}
+
 .preview {
   display: block;
   max-width: 100%;
@@ -280,6 +409,10 @@ function downloadResult() {
   margin-top: 10px;
   margin-bottom: 0;
   text-align: center;
+}
+
+.mt-8 {
+  margin-top: 8px;
 }
 
 .mt-12 {

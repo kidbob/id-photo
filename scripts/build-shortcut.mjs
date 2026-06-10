@@ -1,6 +1,6 @@
 /**
- * 生成可导入的「证件照抠图」快捷指令（.shortcut）
- * 流程：选照片 → 移除背景 → 存入相簿 → 提示打开证件照 App
+ * 生成「证件照抠图」快捷指令
+ * 流程：选照片 → 移除背景 → 存入相簿（无弹窗，便于 x-callback-url 自动跳回 App）
  */
 import { writeFileSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
@@ -26,7 +26,6 @@ function refOutput(uuid, name) {
 const selectUuid = randomUUID()
 const removeUuid = randomUUID()
 const saveUuid = randomUUID()
-const alertUuid = randomUUID()
 
 const workflow = {
   WFWorkflowActions: [
@@ -49,15 +48,6 @@ const workflow = {
       WFWorkflowActionParameters: {
         UUID: saveUuid,
         WFInput: refOutput(removeUuid, 'Image'),
-      },
-    },
-    {
-      WFWorkflowActionIdentifier: 'is.workflow.actions.alert',
-      WFWorkflowActionParameters: {
-        UUID: alertUuid,
-        WFAlertActionTitle: '抠图完成',
-        WFAlertActionMessage:
-          '透明底照片已存入相簿。请打开「证件照」应用：关闭「自动抠图」→ 选该照片 → 选底色与尺寸 → 导出。',
       },
     },
   ],

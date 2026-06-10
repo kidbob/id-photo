@@ -59,11 +59,19 @@ function copyLink() {
     </div>
 
     <div class="card">
-      <h3 class="section-title">完整使用流程</h3>
+      <h3 class="section-title">为什么不能嵌在应用里？</h3>
+      <p class="hint">
+        苹果规定：<strong>移除背景</strong>只能由系统「快捷指令」或原生 App 调用，网页/PWA 不能直接嵌入该界面。
+        折中办法：在本应用点 <strong>开始抠图</strong> → 系统抠完 → <strong>自动跳回</strong>本应用继续，无需自己去找快捷指令 App。
+      </p>
+    </div>
+
+    <div class="card">
+      <h3 class="section-title">推荐流程（全程从本应用出发）</h3>
       <ol class="steps">
-        <li><strong>快捷指令</strong>：运行「证件照抠图」→ 选照片 → 自动抠图 → 透明 PNG 存入相簿</li>
-        <li><strong>证件照 App</strong>：「制作」页 → 确认已<strong>关闭</strong>「浏览器内自动抠图」</li>
-        <li>选择刚保存的照片 → 选规格、底色 → 上传模式压到 ≤50KB → 保存</li>
+        <li><strong>制作</strong> 页 → 点 <strong>开始抠图</strong></li>
+        <li>在快捷指令里选照片，等待抠图保存（会自动回到证件照 App）</li>
+        <li>在步骤 2 选刚存入相簿的照片 → 选规格底色 → <strong>处理并导出</strong></li>
       </ol>
     </div>
 
