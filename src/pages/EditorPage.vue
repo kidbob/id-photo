@@ -34,8 +34,6 @@ const showSpecPicker = ref(false)
 const showBgPicker = ref(false)
 const awaitingPhoto = ref(false)
 const showAdvanced = ref(false)
-const refineHairEdges = ref(true)
-
 const currentSpec = computed(() => findSpec(specId.value))
 const isCustom = computed(() => specId.value === 'custom')
 const targetWidth = computed(() => (isCustom.value ? customWidth.value : currentSpec.value.width))
@@ -61,7 +59,10 @@ onMounted(() => {
     router.replace({ path: route.path, query: {} })
   } else if (route.query.fromShortcut === '1') {
     awaitingPhoto.value = true
-    showToast({ message: '抠图完成，请选刚存入相簿的照片', duration: 3500 })
+    showToast({
+      message: '抠图完成，请选刚存入相簿的照片（若未回到本页，请看 Safari 或多任务）',
+      duration: 4500,
+    })
     router.replace({ path: route.path, query: {} })
   } else if (onIos.value && !hasShortcutInstallHint()) {
     showDialog({
@@ -149,7 +150,6 @@ async function runExport() {
       mode: exportMode.value,
       removeBackground: removeBackground.value,
       mattingQuality: mattingQuality.value,
-      refineHairEdges: refineHairEdges.value,
       onProgress: updateProgress,
     })
 
@@ -270,14 +270,6 @@ function downloadResult() {
         close-on-click-action
         @select="onPickBg"
       />
-      <van-cell
-        title="优化抠图外缘"
-        label="仅修补人像轮廓上的白边/空隙，不涂抹五官内部"
-      >
-        <template #right-icon>
-          <van-switch v-model="refineHairEdges" size="20" />
-        </template>
-      </van-cell>
     </div>
 
     <div class="card">

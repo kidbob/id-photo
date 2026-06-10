@@ -28,10 +28,14 @@ export function getAppReturnUrl(extra?: Record<string, string>): string {
  * 若快捷指令内部某步失败，会走 x-error（同样回到本页并提示）。
  */
 export function getShortcutRunUrl(): string {
-  const returnUrl = encodeURIComponent(getAppReturnUrl())
-  const errorUrl = encodeURIComponent(getAppReturnUrl({ shortcutError: '1' }))
+  const returnUrl = getAppReturnUrl()
+  const errorUrl = getAppReturnUrl({ shortcutError: '1' })
   const name = encodeURIComponent(SHORTCUT_NAME)
-  return `shortcuts://x-callback-url/run-shortcut?name=${name}&x-success=${returnUrl}&x-error=${errorUrl}`
+  const input = encodeURIComponent(returnUrl)
+  const xSuccess = encodeURIComponent(returnUrl)
+  const xError = encodeURIComponent(errorUrl)
+  // input：快捷指令最后一步「打开 URL」；x-success/x-error：旧版 iOS 备用回调
+  return `shortcuts://x-callback-url/run-shortcut?name=${name}&input=text&text=${input}&x-success=${xSuccess}&x-error=${xError}`
 }
 
 export function runShortcutFromApp(): void {

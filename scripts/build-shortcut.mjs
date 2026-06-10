@@ -1,6 +1,6 @@
 /**
  * 生成「证件照抠图」快捷指令
- * 流程：选照片 → 移除背景 → 存储到相簿（is.workflow.actions.savetocameraroll）
+ * 流程：选照片 → 移除背景 → 存储到相簿 → 打开证件照 App（用启动时传入的返回地址）
  */
 import { writeFileSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
@@ -18,6 +18,15 @@ function refOutput(uuid, name) {
       OutputUUID: uuid,
       OutputName: name,
       Type: 'ActionOutput',
+    },
+    WFSerializationType: 'WFTextTokenAttachment',
+  }
+}
+
+function refShortcutInput() {
+  return {
+    Value: {
+      Type: 'ExtensionInput',
     },
     WFSerializationType: 'WFTextTokenAttachment',
   }
@@ -50,6 +59,12 @@ const workflow = {
         WFInput: refOutput(removeUuid, 'Image'),
       },
     },
+    {
+      WFWorkflowActionIdentifier: 'is.workflow.actions.openurl',
+      WFWorkflowActionParameters: {
+        WFInput: refShortcutInput(),
+      },
+    },
   ],
   WFWorkflowClientVersion: '2200.0.1',
   WFWorkflowClientRelease: '18.0',
@@ -61,6 +76,7 @@ const workflow = {
     WFWorkflowIconStartColor: 463140863,
   },
   WFWorkflowImportQuestions: [],
+  WFWorkflowInputContentItemClasses: ['WFStringContentItem', 'WFURLContentItem'],
   WFWorkflowOutputContentItemClasses: [],
   WFWorkflowTypes: [],
   WFWorkflowHasOutputFallback: false,

@@ -105,237 +105,6 @@ function clampByte(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)))
 }
 
-function luminance(r: number, g: number, b: number): number {
-  return 0.299 * r + 0.587 * g + 0.114 * b
-}
-
-function colorDistSq(a: Rgb, b: Rgb): number {
-  const dr = a.r - b.r
-  const dg = a.g - b.g
-  const db = a.b - b.b
-  return dr * dr + dg * dg + db * db
-}
-
-/** 已铺底色图像中，接近背景色的像素 */
-function isBackgroundLike(r: number, g: number, b: number, bg: Rgb): boolean {
-  if (colorDistSq({ r, g, b }, bg) < 42 * 42) return true
-  const lum = luminance(r, g, b)
-  const sat = Math.max(r, g, b) - Math.min(r, g, b)
-  return lum > 165 && sat < 70
-}
-
-function isSkinLike(r: number, g: number, b: number): boolean {
-  const lum = luminance(r, g, b)
-  const sat = Math.max(r, g, b) - Math.min(r, g, b)
-  return lum >= 88 && lum <= 245 && sat >= 8 && sat <= 95 && r >= g - 18 && r >= b - 12
-}
-
-/** 发丝：深色、低饱和，且不像皮肤 */
-function isHairLike(r: number, g: number, b: number): boolean {
-  if (isSkinLike(r, g, b)) return false
-  const lum = luminance(r, g, b)
-  const sat = Math.max(r, g, b) - Math.min(r, g, b)
-  return lum < 92 && sat < 95
-}
-
-const NEIGHBORS_4 = [
-  [-1, 0],
-  [1, 0],
-  [0, -1],
-  [0, 1],
-]
-
-const NEIGHBORS_8 = [
-  ...NEIGHBORS_4,
-  [-1, -1],
-  [-1, 1],
-  [1, -1],
-  [1, 1],
-]
-
-function readRgb(
-  src: Uint8ClampedArray,
-  width: number,
-  height: number,
-  x: number,
-  y: number,
-): Rgb | null {
-  if (x < 0 || y < 0 || x >= width || y >= height) return null
-  const i = (y * width + x) * 4
-  return { r: src[i], g: src[i + 1], b: src[i + 2] }
-}
-
-interface SubjectBounds {
-  minX: number
-  minY: number
-  maxX: number
-  maxY: number
-}
-
-function measureSubjectBounds(
-  src: Uint8ClampedArray,
-  width: number,
-  height: number,
-  bg: Rgb,
-): SubjectBounds | null {
-  let minX = width
-  let minY = height
-  let maxX = 0
-  let maxY = 0
-  let found = false
-
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 4
-      if (isBackgroundLike(src[i], src[i + 1], src[i + 2], bg)) continue
-      found = true
-      minX = Math.min(minX, x)
-      minY = Math.min(minY, y)
-      maxX = Math.max(maxX, x)
-      maxY = Math.max(maxY, y)
-    }
-  }
-
-  if (!found) return null
-  return { minX, minY, maxX, maxY }
-}
-
-/** 背景侧像素且紧贴人像外轮廓 */
-function isContourFringe(
-  src: Uint8ClampedArray,
-  width: number,
-  height: number,
-  x: number,
-  y: number,
-  bg: Rgb,
-): boolean {
-  const self = readRgb(src, width, height, x, y)
-  if (!self || !isBackgroundLike(self.r, self.g, self.b, bg)) return false
-
-  for (const [dx, dy] of NEIGHBORS_4) {
-    const n = readRgb(src, width, height, x + dx, y + dy)
-    if (n && !isBackgroundLike(n.r, n.g, n.b, bg)) return true
-  }
-
-  return false
-}
-
-function hasSkinNearby(
-  src: Uint8ClampedArray,
-  width: number,
-  height: number,
-  x: number,
-  y: number,
-  radius = 2,
-): boolean {
-  for (let dy = -radius; dy <= radius; dy++) {
-    for (let dx = -radius; dx <= radius; dx++) {
-      const n = readRgb(src, width, height, x + dx, y + dy)
-      if (n && isSkinLike(n.r, n.g, n.b)) return true
-    }
-  }
-  return false
-}
-
-function sampleHairAround(
-  src: Uint8ClampedArray,
-  width: number,
-  height: number,
-  x: number,
-  y: number,
-): { count: number; sumR: number; sumG: number; sumB: number; gapLike: boolean } {
-  let count = 0
-  let sumR = 0
-  let sumG = 0
-  let sumB = 0
-  let hairLeft = false
-  let hairRight = false
-  let hairUp = false
-  let hairDown = false
-
-  for (const [dx, dy] of NEIGHBORS_8) {
-    const n = readRgb(src, width, height, x + dx, y + dy)
-    if (!n || !isHairLike(n.r, n.g, n.b)) continue
-    count++
-    sumR += n.r
-    sumG += n.g
-    sumB += n.b
-    if (dx < 0) hairLeft = true
-    if (dx > 0) hairRight = true
-    if (dy < 0) hairUp = true
-    if (dy > 0) hairDown = true
-  }
-
-  return {
-    count,
-    sumR,
-    sumG,
-    sumB,
-    gapLike: (hairLeft && hairRight) || (hairUp && hairDown),
-  }
-}
-
-/**
- * 仅修补抠图外轮廓上的毛刺/小空隙，不处理人脸内部。
- */
-export function refineDarkHairEdges(
-  source: HTMLCanvasElement,
-  bgColor: string,
-): HTMLCanvasElement {
-  const ctx = source.getContext('2d')
-  if (!ctx) throw new Error('无法读取图像')
-
-  const { width, height } = source
-  const bg = parseHex(bgColor)
-  const imageData = ctx.getImageData(0, 0, width, height)
-  const src = imageData.data
-  const out = new Uint8ClampedArray(src)
-  const bounds = measureSubjectBounds(src, width, height, bg)
-  const hairZoneBottom = bounds
-    ? bounds.minY + (bounds.maxY - bounds.minY) * 0.58
-    : height
-
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 4
-      const r = src[i]
-      const g = src[i + 1]
-      const b = src[i + 2]
-
-      if (!isBackgroundLike(r, g, b, bg)) continue
-      if (hasSkinNearby(src, width, height, x, y)) continue
-
-      const onContour = isContourFringe(src, width, height, x, y, bg)
-      const hair = sampleHairAround(src, width, height, x, y)
-      const inHairZone = y <= hairZoneBottom
-
-      const isHairGap = inHairZone && hair.gapLike && hair.count >= 2
-      const isOuterHalo = onContour && hair.count >= 1
-
-      if (!isHairGap && !isOuterHalo) continue
-      if (hair.count < 1) continue
-
-      const avgR = hair.sumR / hair.count
-      const avgG = hair.sumG / hair.count
-      const avgB = hair.sumB / hair.count
-      const blend = isHairGap ? 0.78 : 0.88
-
-      out[i] = clampByte(Math.min(avgR * blend, 58))
-      out[i + 1] = clampByte(Math.min(avgG * blend, 58))
-      out[i + 2] = clampByte(Math.min(avgB * blend, 58))
-      out[i + 3] = 255
-    }
-  }
-
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const outCtx = canvas.getContext('2d')
-  if (!outCtx) throw new Error('无法创建画布')
-  outCtx.putImageData(new ImageData(out, width, height), 0, 0)
-  return canvas
-}
-
 function despillForeground(r: number, g: number, b: number, a: number, bg: Rgb): Rgb {
   let nr = r
   let ng = g
@@ -464,18 +233,6 @@ export async function compressToMaxKb(
   }
 }
 
-function applyCompositeAndRefine(
-  source: HTMLCanvasElement,
-  bgColor: string,
-  refineHair: boolean,
-): HTMLCanvasElement {
-  let canvas = compositeOnBackground(source, bgColor)
-  if (refineHair) {
-    canvas = refineDarkHairEdges(canvas, bgColor)
-  }
-  return canvas
-}
-
 export async function processIdPhoto(options: {
   file: File
   width: number
@@ -485,11 +242,9 @@ export async function processIdPhoto(options: {
   mode: ExportMode
   removeBackground?: boolean
   mattingQuality?: MattingQuality
-  refineHairEdges?: boolean
   forceBgComposite?: boolean
   onProgress?: (message: string) => void
 }): Promise<{ canvas: HTMLCanvasElement; blob: Blob; quality: number | null; sizeKb: number }> {
-  const refineHair = options.refineHairEdges !== false
   let canvas: HTMLCanvasElement
 
   if (options.removeBackground) {
@@ -498,10 +253,10 @@ export async function processIdPhoto(options: {
       options.mattingQuality ?? 'quality',
       options.onProgress,
     )
-    options.onProgress?.('优化边缘并铺底色…')
+    options.onProgress?.('铺底色…')
     const cutoutImg = await loadImageFromBlob(cutout)
     const fullCanvas = imageToCanvas(cutoutImg)
-    canvas = applyCompositeAndRefine(fullCanvas, options.bgColor, refineHair)
+    canvas = compositeOnBackground(fullCanvas, options.bgColor)
     canvas = resizeCover(
       canvas,
       canvas.width,
@@ -513,7 +268,7 @@ export async function processIdPhoto(options: {
     const img = await loadImageFromFile(options.file)
     const fullCanvas = imageToCanvas(img)
     if (options.forceBgComposite || hasTransparency(fullCanvas)) {
-      canvas = applyCompositeAndRefine(fullCanvas, options.bgColor, refineHair)
+      canvas = compositeOnBackground(fullCanvas, options.bgColor)
       canvas = resizeCover(
         canvas,
         canvas.width,
