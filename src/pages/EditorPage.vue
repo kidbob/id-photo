@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showLoadingToast, closeToast, showToast, showDialog } from 'vant'
-import { BG_COLORS, PHOTO_SPECS, findSpec } from '../data/specs'
+import { BG_COLORS, PHOTO_SPECS, findBgColor, findSpec } from '../data/specs'
 import type { ExportMode, MattingQuality } from '../types'
 import { formatSize, processIdPhoto } from '../utils/image-process'
 import {
@@ -34,6 +34,7 @@ const showSpecPicker = ref(false)
 const showBgPicker = ref(false)
 const awaitingPhoto = ref(false)
 const showAdvanced = ref(false)
+const refineHairEdges = ref(true)
 
 const currentSpec = computed(() => findSpec(specId.value))
 const isCustom = computed(() => specId.value === 'custom')
@@ -43,7 +44,11 @@ const bgHex = computed(() => BG_COLORS.find((c) => c.id === bgColorId.value)?.he
 const onIos = computed(() => isLikelyIOS())
 
 const specActions = PHOTO_SPECS.map((s) => ({ name: s.name, specId: s.id }))
-const bgActions = BG_COLORS.map((c) => ({ name: c.name, bgId: c.id }))
+const bgActions = BG_COLORS.map((c) => ({
+  name: `${c.name} · RGB ${c.rgb}`,
+  bgId: c.id,
+}))
+const currentBg = computed(() => findBgColor(bgColorId.value))
 
 onMounted(() => {
   if (route.query.fromShortcut === '1') {
@@ -136,6 +141,7 @@ async function runExport() {
       mode: exportMode.value,
       removeBackground: removeBackground.value,
       mattingQuality: mattingQuality.value,
+      refineHairEdges: refineHairEdges.value,
       onProgress: updateProgress,
     })
 
@@ -244,10 +250,11 @@ function downloadResult() {
         <template #input>
           <span class="bg-preview">
             <i class="bg-dot" :style="{ background: bgHex }" />
-            {{ BG_COLORS.find((c) => c.id === bgColorId)?.name }}
+            {{ currentBg.name }}
           </span>
         </template>
       </van-field>
+      <p class="hint spec-note">RGB {{ currentBg.rgb }}（{{ currentBg.hex }}）· {{ currentBg.note }}</p>
       <van-action-sheet
         v-model:show="showBgPicker"
         :actions="bgActions"
@@ -255,6 +262,14 @@ function downloadResult() {
         close-on-click-action
         @select="onPickBg"
       />
+      <van-cell
+        title="优化黑发边缘"
+        label="填补刘海空隙、去除白/蓝边毛刺（深色头发推荐开启）"
+      >
+        <template #right-icon>
+          <van-switch v-model="refineHairEdges" size="20" />
+        </template>
+      </van-cell>
     </div>
 
     <div class="card">

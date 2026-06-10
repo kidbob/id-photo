@@ -97,8 +97,14 @@ function copyLink() {
         </li>
       </ul>
       <ul class="steps">
-        <li v-for="c in BG_COLORS" :key="c.id">{{ c.name }} {{ c.hex }}</li>
+        <li v-for="c in BG_COLORS" :key="c.id">
+          {{ c.name }}：{{ c.hex }} · RGB({{ c.rgb }}) — {{ c.note }}
+        </li>
       </ul>
+      <p class="hint">
+        国内没有唯一国标色，最常见的是蓝 <code>#438EDB</code> 与浅蓝 <code>#00BFF3</code> 两套。
+        报名页若写了 RGB，请选一致的那一项。
+      </p>
     </div>
 
     <div class="card">

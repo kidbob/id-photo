@@ -2,6 +2,9 @@ export interface BgColor {
   id: string
   name: string
   hex: string
+  /** 标准 RGB 标注，便于对照报名系统要求 */
+  rgb: string
+  note?: string
 }
 
 export interface PhotoSpec {
@@ -74,14 +77,56 @@ export const PHOTO_SPECS: PhotoSpec[] = [
   },
 ]
 
+/**
+ * 证件照底色（行业常用 RGB，无全国唯一强制标准）
+ *
+ * - 蓝色 #438EDB = RGB(67,142,219)：毕业证、简历、工作证、出入境常用
+ * - 浅蓝 #00BFF3 = RGB(0,191,243)：部分在线工具/表格默认浅蓝
+ * - 红色 #FF0000 = RGB(255,0,0)：通用大红
+ * - 深红 #B80202 = RGB(184,2,2)：保险、IC 卡、结婚照等偏深红
+ */
 export const BG_COLORS: BgColor[] = [
-  { id: 'white', name: '白色', hex: '#FFFFFF' },
-  { id: 'blue', name: '蓝色', hex: '#438EDB' },
-  { id: 'red', name: '红色', hex: '#FF0000' },
-  { id: 'light_blue', name: '浅蓝', hex: '#00BFF3' },
-  { id: 'gray', name: '灰色', hex: '#DCDCDC' },
+  {
+    id: 'white',
+    name: '白色',
+    hex: '#FFFFFF',
+    rgb: '255,255,255',
+    note: '身份证、护照、驾驶证、资格考试',
+  },
+  {
+    id: 'blue',
+    name: '蓝色（标准）',
+    hex: '#438EDB',
+    rgb: '67,142,219',
+    note: '毕业证、简历、工作证；出入境照片常用此蓝',
+  },
+  {
+    id: 'light_blue',
+    name: '浅蓝',
+    hex: '#00BFF3',
+    rgb: '0,191,243',
+    note: '部分报名系统/证件照工具默认浅蓝，比标准蓝更亮',
+  },
+  {
+    id: 'red',
+    name: '红色（标准）',
+    hex: '#FF0000',
+    rgb: '255,0,0',
+    note: '通用红底证件',
+  },
+  {
+    id: 'red_dark',
+    name: '深红',
+    hex: '#B80202',
+    rgb: '184,2,2',
+    note: '保险、IC 卡、结婚照等，比纯红略暗',
+  },
 ]
 
 export function findSpec(id: string): PhotoSpec {
   return PHOTO_SPECS.find((s) => s.id === id) ?? PHOTO_SPECS[0]
+}
+
+export function findBgColor(id: string): BgColor {
+  return BG_COLORS.find((c) => c.id === id) ?? BG_COLORS[0]
 }
