@@ -1,10 +1,16 @@
-import type { ExportMode } from '../types'
+import type { ExportMode, MattingQuality } from '../types'
 import { removeBgFromFile } from './remove-background'
 
 export interface CompressResult {
   blob: Blob
   quality: number
   sizeKb: number
+}
+
+interface Rgb {
+  r: number
+  g: number
+  b: number
 }
 
 function loadImageFromUrl(url: string, revoke = false): Promise<HTMLImageElement> {
@@ -49,6 +55,16 @@ function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   })
 }
 
+function imageToCanvas(img: HTMLImageElement): HTMLCanvasElement {
+  const canvas = document.createElement('canvas')
+  canvas.width = img.naturalWidth
+  canvas.height = img.naturalHeight
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('无法创建画布')
+  ctx.drawImage(img, 0, 0)
+  return canvas
+}
+
 /** 居中裁剪缩放，一次到位到目标像素 */
 export function resizeCover(
   source: CanvasImageSource,
@@ -63,6 +79,9 @@ export function resizeCover(
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('无法创建画布')
 
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+
   const scale = Math.max(targetWidth / sourceWidth, targetHeight / sourceHeight)
   const drawWidth = sourceWidth * scale
   const drawHeight = sourceHeight * scale
@@ -73,20 +92,103 @@ export function resizeCover(
   return canvas
 }
 
-/** 透明底 PNG 铺底色（快捷指令抠图输出常用） */
+function parseHex(hex: string): Rgb {
+  const normalized = hex.replace('#', '')
+  return {
+    r: parseInt(normalized.slice(0, 2), 16),
+    g: parseInt(normalized.slice(2, 4), 16),
+    b: parseInt(normalized.slice(4, 6), 16),
+  }
+}
+
+function clampByte(value: number): number {
+  return Math.max(0, Math.min(255, Math.round(value)))
+}
+
+function despillForeground(r: number, g: number, b: number, a: number, bg: Rgb): Rgb {
+  let nr = r
+  let ng = g
+  let nb = b
+  const fringe = 1 - a
+
+  if (fringe <= 0) return { r: nr, g: ng, b: nb }
+
+  if (bg.r >= bg.g && bg.r >= bg.b) {
+    const spill = Math.max(0, nr - Math.max(ng, nb))
+    nr -= spill * fringe * 0.85
+  }
+  if (bg.g >= bg.r && bg.g >= bg.b) {
+    const spill = Math.max(0, ng - Math.max(nr, nb))
+    ng -= spill * fringe * 0.85
+  }
+  if (bg.b >= bg.r && bg.b >= bg.g) {
+    const spill = Math.max(0, nb - Math.max(nr, ng))
+    nb -= spill * fringe * 0.85
+  }
+
+  return { r: nr, g: ng, b: nb }
+}
+
+function refineAlpha(r: number, g: number, b: number, a: number): number {
+  if (a >= 0.92) return 1
+  if (a <= 0.06) return 0
+
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b
+  const saturation = Math.max(r, g, b) - Math.min(r, g, b)
+
+  // 白衣、皮肤等高光区域：提高不透明度，避免底色渗入
+  if (luminance > 175 && saturation < 90 && a > 0.2) {
+    return Math.min(1, a + 0.45)
+  }
+
+  // 头发等深色区域：略提高不透明度，减少色溢
+  if (luminance < 85 && a > 0.15 && a < 0.9) {
+    return Math.min(1, a + 0.12)
+  }
+
+  return a
+}
+
+/**
+ * 先在高分辨率下铺底色，并做边缘去色溢。
+ * 避免半透明蒙版直接把红/蓝底叠到头发和白衣上。
+ */
 export function compositeOnBackground(
   source: HTMLCanvasElement,
   bgColor: string,
 ): HTMLCanvasElement {
+  const srcCtx = source.getContext('2d')
+  if (!srcCtx) throw new Error('无法读取图像')
+
+  const { width, height } = source
+  const src = srcCtx.getImageData(0, 0, width, height)
+  const out = srcCtx.createImageData(width, height)
+  const bg = parseHex(bgColor)
+
+  for (let i = 0; i < src.data.length; i += 4) {
+    let r = src.data[i]
+    let g = src.data[i + 1]
+    let b = src.data[i + 2]
+    let a = src.data[i + 3] / 255
+
+    a = refineAlpha(r, g, b, a)
+    const despilled = despillForeground(r, g, b, a, bg)
+    r = despilled.r
+    g = despilled.g
+    b = despilled.b
+
+    out.data[i] = clampByte(r * a + bg.r * (1 - a))
+    out.data[i + 1] = clampByte(g * a + bg.g * (1 - a))
+    out.data[i + 2] = clampByte(b * a + bg.b * (1 - a))
+    out.data[i + 3] = 255
+  }
+
   const canvas = document.createElement('canvas')
-  canvas.width = source.width
-  canvas.height = source.height
+  canvas.width = width
+  canvas.height = height
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('无法创建画布')
-
-  ctx.fillStyle = bgColor
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-  ctx.drawImage(source, 0, 0)
+  ctx.putImageData(out, 0, 0)
   return canvas
 }
 
@@ -139,23 +241,36 @@ export async function processIdPhoto(options: {
   maxKb: number
   mode: ExportMode
   removeBackground?: boolean
+  mattingQuality?: MattingQuality
   forceBgComposite?: boolean
   onProgress?: (message: string) => void
 }): Promise<{ canvas: HTMLCanvasElement; blob: Blob; quality: number | null; sizeKb: number }> {
-  let img: HTMLImageElement
+  let canvas: HTMLCanvasElement
 
   if (options.removeBackground) {
-    const cutout = await removeBgFromFile(options.file, options.onProgress)
-    options.onProgress?.('抠图完成，正在合成…')
-    img = await loadImageFromBlob(cutout)
+    const cutout = await removeBgFromFile(
+      options.file,
+      options.mattingQuality ?? 'quality',
+      options.onProgress,
+    )
+    options.onProgress?.('优化边缘并铺底色…')
+    const cutoutImg = await loadImageFromBlob(cutout)
+    const fullCanvas = imageToCanvas(cutoutImg)
+    // 先全尺寸铺底再去色溢，最后才缩放到证件照尺寸
+    canvas = compositeOnBackground(fullCanvas, options.bgColor)
+    canvas = resizeCover(
+      canvas,
+      canvas.width,
+      canvas.height,
+      options.width,
+      options.height,
+    )
   } else {
-    img = await loadImageFromFile(options.file)
-  }
-
-  let canvas = resizeCover(img, img.naturalWidth, img.naturalHeight, options.width, options.height)
-
-  if (options.removeBackground || options.forceBgComposite || hasTransparency(canvas)) {
-    canvas = compositeOnBackground(canvas, options.bgColor)
+    const img = await loadImageFromFile(options.file)
+    canvas = resizeCover(img, img.naturalWidth, img.naturalHeight, options.width, options.height)
+    if (options.forceBgComposite || hasTransparency(canvas)) {
+      canvas = compositeOnBackground(canvas, options.bgColor)
+    }
   }
 
   if (options.mode === 'hd') {

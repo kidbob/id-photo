@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { showLoadingToast, closeToast, showToast } from 'vant'
 import { BG_COLORS, PHOTO_SPECS, findSpec } from '../data/specs'
-import type { ExportMode } from '../types'
+import type { ExportMode, MattingQuality } from '../types'
 import { formatSize, processIdPhoto } from '../utils/image-process'
 
 const file = ref<File | null>(null)
@@ -17,6 +17,7 @@ const customHeight = ref(413)
 const resultInfo = ref('')
 const processing = ref(false)
 const removeBackground = ref(true)
+const mattingQuality = ref<MattingQuality>('quality')
 const progressText = ref('')
 const showSpecPicker = ref(false)
 const showBgPicker = ref(false)
@@ -86,6 +87,7 @@ async function runExport() {
       maxKb: maxKb.value,
       mode: exportMode.value,
       removeBackground: removeBackground.value,
+      mattingQuality: mattingQuality.value,
       onProgress: updateProgress,
     })
 
@@ -135,7 +137,7 @@ function downloadResult() {
       <h3 class="section-title">选择照片</h3>
       <p class="hint">
         选照片 → 本机 AI 抠图 → 换底色 → 按规格导出。照片仅在手机浏览器内处理，不上传服务器。
-        首次抠图需下载模型（约 10MB），请保持网络畅通。
+        首次抠图需下载模型（精细约 80MB），请保持网络畅通。
       </p>
       <van-uploader :after-read="onFileRead" accept="image/*" :max-count="1" preview-size="120" />
       <img v-if="previewUrl && !resultUrl" :src="previewUrl" class="preview" alt="原图预览" />
@@ -148,6 +150,16 @@ function downloadResult() {
           <van-switch v-model="removeBackground" size="20" />
         </template>
       </van-cell>
+      <template v-if="removeBackground">
+        <p class="hint">抠图精度</p>
+        <van-radio-group v-model="mattingQuality" direction="horizontal" class="mode-group">
+          <van-radio name="quality">精细（推荐）</van-radio>
+          <van-radio name="fast">快速</van-radio>
+        </van-radio-group>
+        <p class="hint">
+          精细模式边缘更好，首次约多下载 40MB 模型。红/蓝底若渗入头发或白衣，请用精细并换背景简单的原图。
+        </p>
+      </template>
     </div>
 
     <div class="card">
